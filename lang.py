@@ -17,6 +17,9 @@ else:
 conf = get_config()
 
 module_path = os.path.abspath(conf["module_path"])
+component_path = ''
+if "component_path" in conf:
+    component_path = os.path.abspath(conf["component_path"])
 version = get_module_version(module_path)
 
 if isinstance(conf["lang_prefix"], str):
@@ -32,9 +35,14 @@ if "disabled_lang" in conf:
 else:
     disabled_lang = set()
 
+def walk_up_folder(path, depth=1):
+    _cur_depth = 1        
+    while _cur_depth < depth:
+        path = os.path.dirname(path)
+        _cur_depth += 1
+    return path
 
-def get_all_files(path, uncheck_dir=[]):
-    files = set()
+def get_all_files(path, uncheck_dir=[], files = set()):
     for f_name in os.listdir(path):
         if not os.path.isdir(os.path.join(path, f_name)):
             pt = os.path.join(path, f_name)
@@ -46,16 +54,31 @@ def get_all_files(path, uncheck_dir=[]):
                 if _ in os.path.join(path, f_name):
                     uncheck = True
             if not uncheck:
-                f = get_all_files(os.path.join(path, f_name), uncheck_dir)
-                for _ in f:
-                    files.add(_)
+                files = get_all_files(os.path.join(path, f_name), uncheck_dir, files)
     return files
 
 if version:
-    all_files = get_all_files(module_path, [os.path.join('install', 'components')])
+    all_files = get_all_files(module_path, [os.path.join('install','components')])
+    if component_path:
+        for dir_cmp_name in os.listdir(component_path):
+            all_files = get_all_files(os.path.join(component_path, dir_cmp_name), [os.path.join(dir_cmp_name,'templates')], all_files)
+            for dir_template_name in os.listdir(os.path.join(component_path, dir_cmp_name, 'templates')):
+                all_files = get_all_files(os.path.join(component_path, dir_cmp_name, 'templates', dir_template_name), [], all_files)
+    #print(all_files)
+    #exit()
     for _ in all_files:
         file = _[len(module_path):]
         lang_file = os.path.join(module_path, 'lang', 'ru', file[1:])
+        for level in range(1,5):
+            if not os.path.exists(lang_file):
+                c_lang_file = os.path.split(_)
+                lang_file = os.path.join(walk_up_folder(os.path.dirname(_), level), 'lang', 'ru', c_lang_file[1])
+        for level in range(1,5):
+            if not os.path.exists(lang_file):
+                c_lang_file = os.path.split(_)
+                c_lang_file2 = os.path.split(walk_up_folder(_, 2))
+                #print(c_lang_file2)
+                lang_file = os.path.join(walk_up_folder(os.path.dirname(_), level), 'lang', 'ru', c_lang_file2[1], c_lang_file[1])
         lang_values = set()
         if os.path.exists(lang_file):
             with open(lang_file, 'r', encoding='utf-8') as fv:
@@ -84,7 +107,7 @@ if version:
                     #пропускаем или убиваем комментарии
                     if is_php:
                         line_prev = line
-                        line = re.sub(r'^([\s\t]+#.*)', '', line)
+                        line = re.sub(r'^([\s\t]+#[^test]+)', '', line)
                         line = re.sub(r'^([\s\t]+//.*)', '', line)
                         line = re.sub(r'(//.*)$', '', line)
                         line = re.sub(r'(/\*.*\*/)$', '', line)
