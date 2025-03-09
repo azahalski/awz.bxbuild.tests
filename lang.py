@@ -1,6 +1,9 @@
 import sys
 sys.path.append("../")
-from bxbuild.tools import *
+try:
+	from bxbuild.tools import *
+except:
+	from build.tools import *
 import re
 
 args = sys.argv
